@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blocked IPs - Mini SIEM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+        }
+
+        .blocked-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .blocked-header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 20px;
+        }
+
+        .blocked-header h2 {
+            font-size: 1.5em;
+        }
+
+        .blocked-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .blocked-table thead {
+            background: #f8f9fa;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .blocked-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .blocked-table tbody tr {
+            border-bottom: 1px solid #ecf0f1;
+            transition: background-color 0.3s;
+        }
+
+        .blocked-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .blocked-table td {
+            padding: 15px;
+            color: #2c3e50;
+        }
+
+        .ip-display {
+            background: #ecf0f1;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .reason-text {
+            color: #7f8c8d;
+            font-size: 0.95em;
+        }
+
+        .unblock-button {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .unblock-button:hover {
+            background: #229954;
+        }
+
+        .unblock-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .stats-box {
+            background: #ecf0f1;
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        @media (max-width: 768px) {
+            .blocked-table {
+                font-size: 0.9em;
+            }
+
+            .blocked-table th,
+            .blocked-table td {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚫 Blocked IP Addresses</h1>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/alerts">All Alerts</a>
+                <a href="/correlations">Correlations</a>
+                <a href="/search">Search</a>
+                <a href="/blocked-ips">Blocked IPs</a>
+            </div>
+        </header>
+
+        <div class="blocked-container">
+            <div class="blocked-header">
+                <h2>Blocked IP Addresses Management</h2>
+            </div>
+
+            {% if blocked_ips %}
+            <div class="stats-box">
+                Total Blocked IPs: <strong>{{ blocked_ips|length }}</strong>
+            </div>
+
+            <table class="blocked-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Reason</th>
+                        <th>Blocked At</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ip in blocked_ips %}
+                    <tr>
+                        <td>
+                            <span class="ip-display">{{ ip.ip_address }}</span>
+                        </td>
+                        <td class="reason-text">{{ ip.reason }}</td>
+                        <td>{{ ip.blocked_at }}</td>
+                        <td>
+                            <button class="unblock-button" onclick="unblockIP('{{ ip.ip_address }}', this)">
+                                Unblock
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">✅</div>
+                <h3>No blocked IPs</h3>
+                <p>There are currently no blocked IP addresses</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+<script>
+function unblockIP(ip, button) {
+    // Confirm action
+    if (!confirm(`Are you sure you want to unblock ${ip}?`)) {
+        return;
+    }
+
+    // Show loading state
+    const originalText = button.textContent;
+    button.textContent = 'Unblocking...';
+    button.disabled = true;
+
+    // Send unblock request
+    fetch('/api/unblock-ip', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            ip: ip
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the row
+            button.closest('tr').remove();
+            
+            // Show success message
+            alert(`IP ${ip} has been unblocked successfully`);
+
+            // Reload page if no more IPs
+            if (document.querySelectorAll('.blocked-table tbody tr').length === 0) {
+                location.reload();
+            }
+        } else {
+            // Show error message
+            alert(`Error: ${data.message}`);
+            button.textContent = originalText;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while unblocking the IP');
+        button.textContent = originalText;
+        button.disabled = false;
+    });
+}
+</script>
+</html>

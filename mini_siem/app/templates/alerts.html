@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Alerts - Mini SIEM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+        }
+
+        .alerts-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .alerts-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+        }
+
+        .alerts-header h2 {
+            font-size: 1.5em;
+        }
+
+        .alerts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alerts-table thead {
+            background: #f8f9fa;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .alerts-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .alerts-table tbody tr {
+            border-bottom: 1px solid #ecf0f1;
+            transition: background-color 0.3s;
+        }
+
+        .alerts-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .alerts-table td {
+            padding: 15px;
+            color: #2c3e50;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+
+        .severity-critical {
+            background: #ffe6e6;
+            color: #c0392b;
+        }
+
+        .severity-high {
+            background: #fff3e0;
+            color: #d68910;
+        }
+
+        .severity-medium {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .severity-low {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .ip-badge {
+            background: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .block-button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .block-button:hover {
+            background: #c0392b;
+        }
+
+        .block-button.blocked {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .block-button.blocked:hover {
+            background: #95a5a6;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .alerts-table {
+                font-size: 0.9em;
+            }
+
+            .alerts-table th,
+            .alerts-table td {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 All Alerts</h1>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/alerts">All Alerts</a>
+                <a href="/correlations">Correlations</a>
+                <a href="/search">Search</a>
+                <a href="/blocked-ips">Blocked IPs</a>
+            </div>
+        </header>
+
+        <div class="alerts-container">
+            <div class="alerts-header">
+                <h2>All Alerts (Last 100)</h2>
+            </div>
+
+            {% if alerts %}
+            <table class="alerts-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Signature</th>
+                        <th>Source IP</th>
+                        <th>Dest IP</th>
+                        <th>Protocol</th>
+                        <th>Severity</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>#{{ alert.id }}</td>
+                        <td>{{ alert.timestamp }}</td>
+                        <td>{{ alert.signature }}</td>
+                        <td class="ip-badge">{{ alert.src_ip }}</td>
+                        <td class="ip-badge">{{ alert.dst_ip }}</td>
+                        <td>{{ alert.protocol }}</td>
+                        <td>
+                            <span class="severity-badge severity-{{ alert.severity.lower() }}">
+                                {{ alert.severity }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="block-button" onclick="blockIP('{{ alert.src_ip }}', this)">
+                                Block IP
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <h3>No alerts</h3>
+                <p>No alerts have been collected yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+<script>
+function blockIP(ip, button) {
+    // Confirm action
+    if (!confirm(`Are you sure you want to block ${ip}?`)) {
+        return;
+    }
+
+    // Show loading state
+    const originalText = button.textContent;
+    button.textContent = 'Blocking...';
+    button.disabled = true;
+
+    // Send block request
+    fetch('/api/block-ip', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            ip: ip,
+            reason: 'Blocked from alerts dashboard'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update button state
+            button.textContent = '✓ Blocked';
+            button.className = 'block-button blocked';
+            button.disabled = true;
+            button.onclick = null;
+            
+            // Show success message
+            alert(`IP ${ip} has been blocked successfully`);
+        } else {
+            // Show error message
+            alert(`Error: ${data.message}`);
+            button.textContent = originalText;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while blocking the IP');
+        button.textContent = originalText;
+        button.disabled = false;
+    });
+}
+</script>
+</html>

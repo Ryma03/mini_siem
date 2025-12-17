@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Correlations - Mini SIEM</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Segoe+UI:400,600">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .card div:first-child {
+            color: #7f8c8d;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .card div:last-child {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .correlations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .correlation-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .correlation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .correlation-header {
+            padding: 15px;
+            border-bottom: 1px solid #eef2f6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        .correlation-body {
+            padding: 15px;
+        }
+
+        .correlation-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f7fa;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .correlation-stat:last-child {
+            border-bottom: none;
+        }
+
+        .correlation-label {
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .correlation-value {
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+
+        .ip-badge {
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        .severity-critical {
+            color: #c0392b;
+            font-weight: 700;
+        }
+
+        .severity-high {
+            color: #d68910;
+            font-weight: 700;
+        }
+
+        .severity-medium {
+            color: #1565c0;
+            font-weight: 700;
+        }
+
+        .severity-low {
+            color: #2e7d32;
+            font-weight: 700;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .muted {
+            color: #718096;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        @media (max-width: 768px) {
+            .correlations-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔗 Correlations</h1>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/alerts">All Alerts</a>
+                <a href="/search">Search</a>
+                <a href="/analytics">Analytics</a>
+                <a href="/blocked-ips">Blocked IPs</a>
+            </div>
+        </header>
+
+        <div class="summary">
+            <div class="card">
+                <div>Correlations Detected</div>
+                <div>{{ stats.correlations_detected if stats is defined and stats.correlations_detected is defined else (correlations|length if correlations is defined else 0) }}</div>
+            </div>
+            <div class="card">
+                <div>Open Incidents</div>
+                <div>{{ stats.open_incidents if stats is defined and stats.open_incidents is defined else 0 }}</div>
+            </div>
+            <div class="card">
+                <div>Unique IPs Involved</div>
+                <div>{{ stats.unique_ips if stats is defined and stats.unique_ips is defined else '—' }}</div>
+            </div>
+        </div>
+
+        {% if correlations and correlations|length > 0 %}
+        <div class="correlations-grid">
+            {% for corr in correlations %}
+            {# precompute safe variables to avoid inline-complex Jinja inside attributes/JS #}
+            {% set _id = corr.id|default('') %}
+            {% if corr.src_ip is defined and corr.src_ip %}
+                {% set _src = corr.src_ip %}
+            {% elif corr.involved_ips is defined and corr.involved_ips|length > 0 %}
+                {% set _src = corr.involved_ips[0] %}
+            {% else %}
+                {% set _src = '—' %}
+            {% endif %}
+            {% set _alert_count = (corr.alert_count if corr.alert_count is defined else (corr.count if corr.count is defined else 0)) %}
+            {% if corr.unique_signatures is defined %}
+                {% set _unique_sigs = corr.unique_signatures %}
+            {% elif corr.top_signatures is defined %}
+                {% set _unique_sigs = corr.top_signatures|length %}
+            {% else %}
+                {% set _unique_sigs = 0 %}
+            {% endif %}
+            {% set _first = corr.first_alert_time if corr.first_alert_time is defined else (corr.start_time if corr.start_time is defined else '—') %}
+            {% set _last = corr.last_alert_time if corr.last_alert_time is defined else (corr.end_time if corr.end_time is defined else '—') %}
+            {# compute a safe severity string #}
+            {% set _sev = 'HIGH' %}
+            {% if corr.details is defined and corr.details %}
+                {% if corr.details.severity is defined %}
+                    {% set _sev = corr.details.severity %}
+                {% elif corr.details['severity'] is defined %}
+                    {% set _sev = corr.details['severity'] %}
+                {% endif %}
+            {% elif corr.severity is defined %}
+                {% set _sev = corr.severity %}
+            {% endif %}
+
+            <div class="correlation-card">
+                <div class="correlation-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <strong>{{ _id if _id else '—' }}</strong>
+                            <div class="muted">{{ corr.attack_type if corr.attack_type is defined else (corr.type if corr.type is defined else 'Correlation') }}</div>
+                        </div>
+                        <div class="muted">Severity: <span class="severity-{{ _sev|lower }}">{{ _sev }}</span></div>
+                    </div>
+                </div>
+                <div class="correlation-body">
+                    <div class="correlation-stat"><span class="muted">Source IP</span><span class="ip-badge">{{ _src }}</span></div>
+                    <div class="correlation-stat"><span class="muted">Total Alerts</span><span>{{ _alert_count }}</span></div>
+                    <div class="correlation-stat"><span class="muted">Unique Signatures</span><span>{{ _unique_sigs }}</span></div>
+                    <div class="correlation-stat"><span class="muted">First Alert</span><span>{{ _first }}</span></div>
+                    <div class="correlation-stat"><span class="muted">Last Alert</span><span>{{ _last }}</span></div>
+                    <div style="margin-top:8px;display:flex;gap:8px">
+                        <button class="btn ghost" data-corr-id="{{ _id }}" onclick="openAlerts(this)">Open Alerts</button>
+                        <button class="btn primary" data-corr-id="{{ _id }}" onclick="createIncidentFromEl(this)">Create Incident</button>
+                        {% if (corr.involved_ips is defined and corr.involved_ips|length > 0) or (corr.src_ip is defined) %}
+                        <button class="btn" data-corr-id="{{ _id }}" style="background:#e53e3e;color:#fff;border-radius:6px;border:0;padding:8px 10px" onclick="blockIPsFromEl(this)">Block Primary IP</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">✓</div>
+            <h3>No correlations detected</h3>
+            <p class="muted">The correlation engine will show detected patterns here when available.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function openAlerts(el){
+            const id = el && el.dataset ? el.dataset.corrId : '';
+            if(!id) return;
+            window.location = '/alerts?correlation_id=' + encodeURIComponent(id);
+        }
+
+        function createIncidentFromEl(el){
+            const id = el && el.dataset ? el.dataset.corrId : '';
+            createIncident(id);
+        }
+
+        function blockIPsFromEl(el){
+            const id = el && el.dataset ? el.dataset.corrId : '';
+            blockIPs(id);
+        }
+
+        function createIncident(corrId){
+            if(!corrId) return alert('Missing correlation id');
+            if(!confirm('Create an incident for correlation #' + corrId + '?')) return;
+            fetch('/api/correlations/create-incident', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:corrId})})
+            .then(r=>r.json()).then(j=>{ if(j.success) alert('Incident created'); else alert('Error: '+(j.message||'unknown'))}).catch(e=>alert('Request failed'));
+        }
+
+        function blockIPs(corrId){
+            if(!corrId) return alert('Missing correlation id');
+            if(!confirm('Block the primary IPs for correlation #' + corrId + '?')) return;
+            fetch('/api/correlations/block-ips', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:corrId})})
+            .then(r=>r.json()).then(j=>{ if(j.success) alert('IPs blocked'); else alert('Error: '+(j.message||'unknown'))}).catch(e=>alert('Request failed'));
+        }
+    </script>
+</body>
+</html>

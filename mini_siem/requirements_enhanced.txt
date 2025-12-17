@@ -1,0 +1,31 @@
+# Requirements for Mini SIEM Enhanced Version
+# Install with: pip install -r requirements_enhanced.txt
+
+# Core dependencies (original)
+Flask==2.3.3
+Werkzeug==2.3.7
+requests==2.31.0
+ipwhois==1.2.0
+python-dateutil==2.8.2
+
+# Enhanced features (NEW)
+Flask-SocketIO==5.5.1
+python-socketio==5.15.0
+python-engineio==4.12.3
+plotly==6.5.0
+pandas==2.3.3
+
+# Supporting dependencies (automatically installed)
+# bidict==0.23.1         (for Socket.IO)
+# simple-websocket==1.1.0 (for WebSocket)
+# wsproto==1.3.2         (for WebSocket)
+# h11==0.16.0            (for WebSocket)
+# six==1.16.0            (for compatibility)
+# packaging==24.0        (for versioning)
+# narwhals==1.3.0        (for pandas compat)
+# tzdata==2024.1         (for timezone support)
+# pytz==2024.1           (for timezone)
+
+# Optional - for production deployment
+gunicorn==21.2.0         # Production WSGI server
+python-dotenv==1.0.0     # Environment variables

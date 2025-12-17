@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Mini SIEM</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-mini {
+            background: rgb(235, 235, 235);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-mini h3 {
+            color: #7f8c8d;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-mini .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-card {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .chart-card h2 {
+            margin-bottom: 15px;
+            color: #ffffff;
+            font-size: 1.25em;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            min-height: 520px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+
+            .stat-mini .value {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Security Analytics</h1>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/alerts">All Alerts</a>
+                <a href="/correlations">Correlations</a>
+                <a href="/search">Search</a>
+                <a href="/analytics">Analytics</a>
+                <a href="/blocked-ips">Blocked IPs</a>
+            </div>
+        </header>
+
+        <div class="stats-summary">
+            <div class="stat-mini">
+                <h3>Total Alerts</h3>
+                <div class="value">{{ stats.total_alerts }}</div>
+            </div>
+            <div class="stat-mini">
+                <h3>Unique IPs</h3>
+                <div class="value">{{ stats.unique_ips }}</div>
+            </div>
+            <div class="stat-mini">
+                <h3>Correlations</h3>
+                <div class="value">{{ stats.correlations_detected }}</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Alert Timeline (7 Days)</h2>
+                <div class="chart-container" id="timeline-chart">
+                    {% if not timeline_chart %}
+                    <div style="padding:30px; color:#b0b8c0;">No timeline data available.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2>Severity Distribution</h2>
+                <div class="chart-container" id="severity-chart">
+                    {% if not severity_chart %}
+                    <div style="padding:30px; color:#b0b8c0;">No severity data available.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2>Top 10 Attacking IPs</h2>
+                <div class="chart-container" id="top-ips-chart">
+                    {% if not top_ips_chart %}
+                    <div style="padding:30px; color:#b0b8c0;">No IP data available.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2>Top 10 Attack Signatures</h2>
+                <div class="chart-container" id="top-sigs-chart">
+                    {% if not top_sigs_chart %}
+                    <div style="padding:30px; color:#b0b8c0;">No signature data available.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embed chart JSON safely in HTML so JS can read it without inline Jinja in code -->
+    <script id="timeline-data" type="application/json">{{ timeline_chart | default('null') | safe }}</script>
+    <script id="severity-data" type="application/json">{{ severity_chart | default('null') | safe }}</script>
+    <script id="top-ips-data" type="application/json">{{ top_ips_chart | default('null') | safe }}</script>
+    <script id="top-sigs-data" type="application/json">{{ top_sigs_chart | default('null') | safe }}</script>
+
+    <script>
+        // Helper to safely parse server-provided chart JSON (handles strings or objects)
+        function parseChart(chart) {
+            try {
+                if (!chart) return null;
+                if (typeof chart === 'string') return JSON.parse(chart);
+                return chart;
+            } catch (e) {
+                console.error('parseChart error:', e);
+                return null;
+            }
+        }
+
+        function renderCharts() {
+            // Timeline (read embedded JSON)
+            try {
+                const elTimeline = document.getElementById('timeline-data');
+                const timelineRaw = elTimeline ? elTimeline.textContent : null;
+                const timelineData = parseChart(timelineRaw);
+                if (timelineData && document.getElementById('timeline-chart')) {
+                    Plotly.newPlot('timeline-chart', timelineData.data, timelineData.layout);
+                }
+            } catch (e) {
+                console.error('Error rendering timeline chart:', e);
+            }
+
+            // Severity
+            try {
+                const elSeverity = document.getElementById('severity-data');
+                const severityRaw = elSeverity ? elSeverity.textContent : null;
+                const severityData = parseChart(severityRaw);
+                if (severityData && document.getElementById('severity-chart')) {
+                    Plotly.newPlot('severity-chart', severityData.data, severityData.layout);
+                }
+            } catch (e) {
+                console.error('Error rendering severity chart:', e);
+            }
+
+            // Top IPs
+            try {
+                const elTopIps = document.getElementById('top-ips-data');
+                const topIpsRaw = elTopIps ? elTopIps.textContent : null;
+                const topIpsData = parseChart(topIpsRaw);
+                if (topIpsData && document.getElementById('top-ips-chart')) {
+                    Plotly.newPlot('top-ips-chart', topIpsData.data, topIpsData.layout);
+                }
+            } catch (e) {
+                console.error('Error rendering top IPs chart:', e);
+            }
+
+            // Top signatures
+            try {
+                const elTopSigs = document.getElementById('top-sigs-data');
+                const topSigsRaw = elTopSigs ? elTopSigs.textContent : null;
+                const topSigsData = parseChart(topSigsRaw);
+                if (topSigsData && document.getElementById('top-sigs-chart')) {
+                    Plotly.newPlot('top-sigs-chart', topSigsData.data, topSigsData.layout);
+                }
+            } catch (e) {
+                console.error('Error rendering signatures chart:', e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCharts();
+        });
+    </script>
+</body>
+</html>

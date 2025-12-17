@@ -1,0 +1,95 @@
+✅Alert Collector (Snort log parser + mock data generator)
+✅ IP Enrichment Engine (geolocation, ASN, organization)
+✅ Correlation Engine (3 attack detection patterns)
+✅ SQLite Database (alerts + correlations storage)
+✅ Flask Web Dashboard (5 pages + JSON APIs)
+✅ Background Orchestrator (threading coordination)
+File			Purpose			Status
+core/database.py	SQLite alert storage	✅ Complete
+core/collector.py	Snort alert parsing	✅ Complete
+core/enricher.py	IP geolocation/ASN	✅ Complete
+core/correlator.py	Attack detection	✅ Complete
+app/main.py		Flask web dashboard	✅ Complete
+siem_orchestrator.py	Main orchestrator	✅ Complete
+test_suite.py		Validation tests	✅ Complete
+config.py		Configuration		✅ Complete
+
+1. Alert Collection (Snort Machine - Ubuntu)
+Snort runs on Ubuntu machine and monitors network traffic
+Detects suspicious activity based on security rules
+Generates alert data in /var/log/snort/alert_fast.log
+2. Alert Processing (Target Machine - Ubuntu)
+Your Python SIEM application receives alerts through:
+
+collector.py → Reads Snort logs
+
+	Parses alert data from log file
+	Extracts: source IP, destination IP, port, protocol, signature
+	Normalizes to Python dictionary format
+enricher.py → Enhances alert data
+
+	Adds geolocation (country, city, coordinates)
+	Adds ASN (Autonomous System Number)
+	Adds organization name
+	Uses IP-API.com service with caching
+correlator.py → Detects attack patterns
+
+Groups related alerts together
+Detects 3 attack types:
+	DoS (Denial of Service) - 5+ alerts in 10 minutes
+	Reconnaissance - 3+ different signatures from same IP
+	Exploitation - Rapid alerts (< 30 seconds apart)
+3. Data Storage (SQLite Database)
+	alerts table:
+├─ id, signature, src_ip, dst_ip
+├─ src_port, dst_port, protocol
+├─ severity, message, timestamp
+└─ enrichment_data
+
+	correlations table:
+├─ id, attack_type, src_ip
+├─ alert_count, unique_signatures
+└─ first_alert_time, last_alert_time
+
+4. Web Dashboard (Flask Application)
+app/main.py provides web interface with:
+
+Page		Function
+Dashboard	Overview statistics, recent alerts
+Alerts	View 	all collected alerts
+Correlations	See detected attack patterns
+Search		Query alerts by IP, signature, severity
+API Endpoints	JSON APIs for integration
+5. Admin Interface
+Administrator/Security Analyst accesses:
+Web dashboard: http://localhost:5000
+View alerts and correlations
+Search and filter events
+Analyze threats
+Generate reports
+
+1. Attacker (Kali Machine)
+   ↓ Sends attack traffic (nmap, exploit, etc.)
+   ↓
+2. Snort (Ubuntu - Snort Machine)
+   Detects: "TCP Port Scan"
+   Writes to: /var/log/snort/alert_fast.log
+   ↓
+3. Collector (Python)
+   Reads: "192.168.x.x -> 192.168.x.y:22"
+   ↓
+4. Enricher (Python)
+   Adds: Geolocation, ASN, Organization
+   ↓
+5. Database (SQLite)
+   Stores: Alert + enrichment data
+   ↓
+6. Correlator (Python)
+   Analyzes: Multiple alerts from same IP
+   Detects: "High Volume Attack (DoS)" pattern
+   ↓
+7. Web Dashboard
+   Displays: Attack details, timeline, severity
+   ↓
+8. Administrator
+   Views alerts and takes action
