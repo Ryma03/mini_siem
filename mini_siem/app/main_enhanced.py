@@ -13,6 +13,8 @@ import plotly
 import plotly.graph_objects as go
 import pandas as pd
 from collections import Counter
+import threading
+import time
 
 # Get parent directory for imports
 import sys
@@ -20,6 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.database import DatabaseManager
 from core.enricher import IPEnricher
+from core.collector import AlertCollector
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,36 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Initialize managers
 db_manager = DatabaseManager()
 ip_enricher = IPEnricher(use_free_api=True)
+
+# Initialize real Snort collector
+alert_collector = AlertCollector(alert_file=config.SNORT_ALERT_FILE)
+
+# Start collector thread
+def start_collector():
+    """Start the alert collector in background"""
+    if alert_collector.start_collection():
+        logger.info("Real Snort alert collector started successfully")
+        while True:
+            try:
+                alerts = alert_collector.read_new_alerts()
+                if alerts:
+                    for alert in alerts:
+                        # Enrich and store alerts
+                        enriched_alert = ip_enricher.enrich_alert(alert)
+                        alert_id = db_manager.insert_alert(enriched_alert)
+                        logger.info(f"Snort Alert collected: {alert['signature']} [ID: {alert_id}]")
+                        # Emit real-time update via WebSocket
+                        socketio.emit('new_alert', enriched_alert, broadcast=True)
+                time.sleep(config.COLLECTION_INTERVAL)
+            except Exception as e:
+                logger.error(f"Error in collector loop: {str(e)}")
+                time.sleep(5)
+    else:
+        logger.warning("Could not start real Snort collector - file not found")
+
+# Start collector thread on app startup
+collector_thread = threading.Thread(target=start_collector, daemon=True)
+collector_thread.start()
 
 # Shared color palette for charts (consistent across charts)
 PALETTE = {
