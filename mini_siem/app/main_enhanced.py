@@ -44,29 +44,46 @@ alert_collector = AlertCollector(alert_file=config.SNORT_ALERT_FILE)
 # Start collector thread
 def start_collector():
     """Start the alert collector in background"""
+    import sys
+    print(f"[COLLECTOR] Attempting to start collector with file: {config.SNORT_ALERT_FILE}", file=sys.stderr)
+    sys.stderr.flush()
+    
     if alert_collector.start_collection():
+        print("[COLLECTOR] ✓ Real Snort alert collector started successfully", file=sys.stderr)
+        sys.stderr.flush()
         logger.info("Real Snort alert collector started successfully")
+        
         while True:
             try:
                 alerts = alert_collector.read_new_alerts()
                 if alerts:
+                    print(f"[COLLECTOR] Found {len(alerts)} new alerts", file=sys.stderr)
+                    sys.stderr.flush()
                     for alert in alerts:
                         # Enrich and store alerts
                         enriched_alert = ip_enricher.enrich_alert(alert)
                         alert_id = db_manager.insert_alert(enriched_alert)
+                        print(f"[COLLECTOR] Stored alert: {alert['signature']} (ID: {alert_id})", file=sys.stderr)
+                        sys.stderr.flush()
                         logger.info(f"Snort Alert collected: {alert['signature']} [ID: {alert_id}]")
                         # Emit real-time update via WebSocket
                         socketio.emit('new_alert', enriched_alert, broadcast=True)
                 time.sleep(config.COLLECTION_INTERVAL)
             except Exception as e:
+                print(f"[COLLECTOR ERROR] {str(e)}", file=sys.stderr)
+                sys.stderr.flush()
                 logger.error(f"Error in collector loop: {str(e)}")
                 time.sleep(5)
     else:
+        print("[COLLECTOR] ✗ Could not start real Snort collector - file not found or error", file=sys.stderr)
+        sys.stderr.flush()
         logger.warning("Could not start real Snort collector - file not found")
 
 # Start collector thread on app startup
+print("[MAIN] Starting collector thread...", file=sys.stderr)
 collector_thread = threading.Thread(target=start_collector, daemon=True)
 collector_thread.start()
+print("[MAIN] Collector thread started (daemon)", file=sys.stderr)
 
 # Shared color palette for charts (consistent across charts)
 PALETTE = {
