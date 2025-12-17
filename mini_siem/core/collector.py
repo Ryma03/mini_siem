@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 class SnortAlertParser:
     """Parses Snort alerts from the alert_fast.log file"""
 
-    # Snort alert format regex for fast log format
-    # Example: 01/02-13:45:33.123456  [Classification: Attempted Information Leak] [Priority: 2]
-    # {TCP} 192.168.1.100:54321 -> 10.0.0.1:443
+    # Snort alert format regex for full alert format
+    # Example: 12/17-18:21:52.730564  [**] [1:1917:6] SCAN UPnP service discover attempt [**] [Classification: Detection of a Network Scan] [Priority: 3] {UDP} 192.168.1.62:54670 -> 239.255.255.250:1900
     SNORT_ALERT_REGEX = re.compile(
         r"(\d{2}/\d{2}-\d{2}:\d{2}:\d{2}\.\d+)\s+"
-        r"\[Classification: ([^\]]+)\]\s+\[Priority: (\d+)\]\s+"
+        r"\[\*\*\]\s+\[[\d:]+\]\s+([^\[]+?)\s+\[\*\*\]\s+"
+        r"\[Classification:\s*([^\]]+)\]\s+\[Priority:\s*(\d+)\]\s+"
         r"\{([A-Z]+)\}\s+"
         r"([0-9.]+):(\d+)\s+->\s+([0-9.]+):(\d+)"
     )
@@ -54,18 +54,18 @@ class SnortAlertParser:
             return None
 
         try:
-            timestamp_str, classification, priority, protocol, src_ip, src_port, dst_ip, dst_port = match.groups()
+            timestamp_str, signature, classification, priority, protocol, src_ip, src_port, dst_ip, dst_port = match.groups()
 
             # Parse timestamp
             timestamp = datetime.strptime(timestamp_str, "%m/%d-%H:%M:%S.%f")
             
-            # Extract signature from classification (usually first part)
-            signature = classification.split('|')[0].strip() if '|' in classification else classification
+            # Clean up signature
+            signature = signature.strip()
 
             alert = {
                 'timestamp': timestamp,
                 'signature': signature,
-                'classification': classification,
+                'classification': classification.strip(),
                 'priority': priority,
                 'severity': self.SEVERITY_MAP.get(priority, 'INFO'),
                 'protocol': protocol,
