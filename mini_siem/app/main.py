@@ -3,13 +3,16 @@ Flask web interface for Mini SIEM
 Provides dashboard for visualizing and managing alerts
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import logging
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import threading
 import time
+import os
 
 # Get parent directory for imports
 import sys
@@ -24,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
+app.secret_key = os.environ.get('SECRET_KEY', 'mini-siem-secret-key-change-in-production')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
 # Initialize managers
 db_manager = DatabaseManager()
@@ -58,7 +63,116 @@ collector_thread = threading.Thread(target=start_collector, daemon=True)
 collector_thread.start()
 
 
+# Authentication decorator
+def login_required(f):
+    """Decorator to require login for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Veuillez vous connecter pour accéder à cette page.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page and handler"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember')
+        
+        # Validate input
+        if not username or not password:
+            return render_template('login.html', error='Veuillez remplir tous les champs')
+        
+        # Get user from database
+        user = db_manager.get_admin_by_username(username)
+        
+        if user and check_password_hash(user['password_hash'], password):
+            # Login successful
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['email'] = user['email']
+            
+            if remember:
+                session.permanent = True
+            
+            # Update last login
+            db_manager.update_last_login(username)
+            
+            logger.info(f"User {username} logged in successfully")
+            flash('Connexion réussie !', 'success')
+            return redirect(url_for('index'))
+        else:
+            logger.warning(f"Failed login attempt for username: {username}")
+            return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+    
+    # GET request - show login form
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    
+    return render_template('login.html')
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Registration page and handler"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not username or not email or not password or not confirm_password:
+            return render_template('register.html', error='Veuillez remplir tous les champs')
+        
+        if len(username) < 3:
+            return render_template('register.html', error='Le nom d\'utilisateur doit contenir au moins 3 caractères')
+        
+        if len(password) < 8:
+            return render_template('register.html', error='Le mot de passe doit contenir au moins 8 caractères')
+        
+        if password != confirm_password:
+            return render_template('register.html', error='Les mots de passe ne correspondent pas')
+        
+        # Check password strength
+        if not any(c.isupper() for c in password) or not any(c.islower() for c in password) or not any(c.isdigit() for c in password):
+            return render_template('register.html', error='Le mot de passe doit contenir des majuscules, minuscules et chiffres')
+        
+        # Hash password
+        password_hash = generate_password_hash(password)
+        
+        # Create user
+        success = db_manager.create_admin(username, password_hash, email)
+        
+        if success:
+            logger.info(f"New admin user registered: {username}")
+            return render_template('login.html', success='Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
+        else:
+            return render_template('register.html', error='Ce nom d\'utilisateur ou email existe déjà')
+    
+    # GET request - show registration form
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    
+    return render_template('register.html')
+
+
+@app.route('/logout')
+def logout():
+    """Logout handler"""
+    username = session.get('username', 'Unknown')
+    session.clear()
+    logger.info(f"User {username} logged out")
+    flash('Déconnexion réussie !', 'success')
+    return redirect(url_for('login'))
+
+
 @app.route('/')
+@login_required
 def index():
     """Main dashboard page"""
     try:
@@ -85,6 +199,7 @@ def index():
 
 
 @app.route('/api/alerts', methods=['GET'])
+@login_required
 def get_alerts():
     """Get recent alerts as JSON"""
     try:
@@ -102,6 +217,7 @@ def get_alerts():
 
 
 @app.route('/api/alerts/ip/<ip>', methods=['GET'])
+@login_required
 def get_alerts_by_ip(ip):
     """Get alerts from specific IP"""
     try:
@@ -121,6 +237,7 @@ def get_alerts_by_ip(ip):
 
 
 @app.route('/api/correlations', methods=['GET'])
+@login_required
 def get_correlations():
     """Get detected correlations"""
     try:
@@ -137,6 +254,7 @@ def get_correlations():
 
 
 @app.route('/api/enrich-ip/<ip>', methods=['GET'])
+@login_required
 def enrich_ip(ip):
     """Enrich an IP address"""
     try:
@@ -153,6 +271,7 @@ def enrich_ip(ip):
 
 
 @app.route('/api/stats', methods=['GET'])
+@login_required
 def get_stats():
     """Get system statistics"""
     try:
@@ -175,6 +294,7 @@ def get_stats():
 
 
 @app.route('/api/alerts/severity/<severity>', methods=['GET'])
+@login_required
 def get_alerts_by_severity(severity):
     """Get alerts by severity level"""
     try:
@@ -193,6 +313,7 @@ def get_alerts_by_severity(severity):
 
 
 @app.route('/alerts')
+@login_required
 def alerts_page():
     """Alerts management page"""
     try:
@@ -204,6 +325,7 @@ def alerts_page():
 
 
 @app.route('/correlations')
+@login_required
 def correlations_page():
     """Correlations page"""
     try:
@@ -215,6 +337,7 @@ def correlations_page():
 
 
 @app.route('/search')
+@login_required
 def search():
     """Search alerts"""
     try:
@@ -241,6 +364,7 @@ def search():
 
 
 @app.route('/api/block-ip', methods=['POST'])
+@login_required
 def block_ip_api():
     """Block an IP address"""
     try:
@@ -270,6 +394,7 @@ def block_ip_api():
 
 
 @app.route('/api/unblock-ip', methods=['POST'])
+@login_required
 def unblock_ip_api():
     """Unblock an IP address"""
     try:
@@ -298,6 +423,7 @@ def unblock_ip_api():
 
 
 @app.route('/api/blocked-ips')
+@login_required
 def get_blocked_ips_api():
     """Get list of all blocked IPs"""
     try:
@@ -313,6 +439,7 @@ def get_blocked_ips_api():
 
 
 @app.route('/blocked-ips')
+@login_required
 def blocked_ips_page():
     """Show blocked IPs management page"""
     try:

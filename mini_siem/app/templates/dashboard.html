@@ -31,6 +31,38 @@
             margin-bottom: 30px;
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .user-info {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-name {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
         }
 
         h1 {
@@ -246,6 +278,10 @@
 <body>
     <div class="container">
         <header>
+            <div class="user-info">
+                <span class="user-name">👤 {{ session.username }}</span>
+                <a href="/logout" class="logout-btn">Déconnexion</a>
+            </div>
             <h1>🛡️ Mini SIEM</h1>
             <p class="subtitle">Security Information and Event Management Dashboard</p>
             <div class="nav-links">

@@ -69,6 +69,18 @@ class DatabaseManager:
                 )
             """)
             
+            # Create admin users table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME
+                )
+            """)
+            
             # Create indices for better query performance
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_src_ip ON alerts(src_ip)
@@ -362,3 +374,65 @@ class DatabaseManager:
             
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def create_admin(self, username: str, password_hash: str, email: str) -> bool:
+        """
+        Create a new admin user
+        
+        Args:
+            username: Admin username
+            password_hash: Hashed password
+            email: Admin email
+            
+        Returns:
+            True if successful, False if username/email already exists
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    INSERT INTO admin_users (username, password_hash, email)
+                    VALUES (?, ?, ?)
+                """, (username, password_hash, email))
+                
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def get_admin_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """
+        Get admin user by username
+        
+        Args:
+            username: Username to lookup
+            
+        Returns:
+            Admin user dictionary or None
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, username, password_hash, email, created_at, last_login
+                FROM admin_users 
+                WHERE username = ?
+            """, (username,))
+            
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_last_login(self, username: str):
+        """Update last login time for admin user"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE admin_users 
+                SET last_login = CURRENT_TIMESTAMP
+                WHERE username = ?
+            """, (username,))
+            
+            conn.commit()
